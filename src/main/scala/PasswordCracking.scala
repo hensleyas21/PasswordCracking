@@ -6,6 +6,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent._
 import ExecutionContext.Implicits.global
+import scala.util.{Failure, Success}
 
 // Instructor Example Times
 // Sequential: Found 83 passwords of length 4 in 921.411 seconds
@@ -21,8 +22,18 @@ import ExecutionContext.Implicits.global
   val symbols = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
   val fullCharset = lowercase + uppercase + digits + symbols
   // try brute forcing all passwords of a specific length n
-  val length = 1
-  val passwords = bruteForceCollection(fullCharset, length, hashes)
+  val length = 3
+  val (duration, passwords) = timeIt(bruteForceLoop(fullCharset, length, hashes))
+  val (time, p) = timeIt(Await.ready(parallelBruteForce(fullCharset, length, hashes), 10.seconds).value match
+    case None => Set.empty[String]
+    case Some(response) => response match
+      case Failure(exception) => throw exception
+      case Success(result) => result
+  )
+  println(s"Time ran: ${time} ms")
+  println(s"One Character Passwords: ${p.mkString(", ")}")
+
+  println(s"Time ran: ${duration} ms")
   println(s"One Character Passwords: ${passwords.mkString(", ")}")
   // note that the getCombination function could also be used to combine words . . .
   val words = Vector("correct", "horse", "battery", "staple")
@@ -133,15 +144,15 @@ def getHashes: Set[String] = {
 def parallelBruteForce(chars: String, length: Int, hashes: Set[String]): Future[Iterable[String]] ={
   //get the number of cores to determine the number of threads we need
   val numThreads = Runtime.getRuntime.availableProcessors()
-  
+
   //start at password 0
   val start = BigInt(0)
   //go to the total number of possible passwords
   val stop = BigInt(chars.length).pow(length)
-  
+
   //divide how many passwords each thread should be checking, the plus one is to catch passwords missed when rounding
   val pwdsPerThread = (stop / numThreads) + 1
-  
+
   //make same call as non parallelized function
   val makeCombination = getCombination(chars)(length)
 
@@ -153,7 +164,7 @@ def parallelBruteForce(chars: String, length: Int, hashes: Set[String]): Future[
       val threadEnd = (threadStart + pwdsPerThread).min(stop)
       val passwords = mutable.ArrayBuffer[String]()
       var cursor = threadStart
-      
+
       //same password checking like in brute force above
       while (cursor < threadEnd) {
         val pwd = makeCombination(cursor).mkString
