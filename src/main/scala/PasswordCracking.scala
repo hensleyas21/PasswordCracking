@@ -4,6 +4,8 @@ import scala.collection.parallel.CollectionConverters.*
 import scala.collection.{AbstractIterable, AbstractIterator, mutable}
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent._
+import ExecutionContext.Implicits.global
 
 // Instructor Example Times
 // Sequential: Found 83 passwords of length 4 in 921.411 seconds
@@ -125,4 +127,42 @@ def getHashes: Set[String] = {
   } finally {
     src.close()
   }
+}
+
+
+def parallelBruteForce(chars: String, length: Int, hashes: Set[String]): Future[Iterable[String]] ={
+  //get the number of cores to determine the number of threads we need
+  val numThreads = Runtime.getRuntime.availableProcessors()
+  
+  //start at password 0
+  val start = BigInt(0)
+  //go to the total number of possible passwords
+  val stop = BigInt(chars.length).pow(length)
+  
+  //divide how many passwords each thread should be checking, the plus one is to catch passwords missed when rounding
+  val pwdsPerThread = (stop / numThreads) + 1
+  
+  //make same call as non parallelized function
+  val makeCombination = getCombination(chars)(length)
+
+  //make a future for each thread and its results
+  val futures = (0 until numThreads).map { i =>
+    Future {
+      //get which password to start with based on what thread is running
+      val threadStart = start + (i * pwdsPerThread)
+      val threadEnd = (threadStart + pwdsPerThread).min(stop)
+      val passwords = mutable.ArrayBuffer[String]()
+      var cursor = threadStart
+      
+      //same password checking like in brute force above
+      while (cursor < threadEnd) {
+        val pwd = makeCombination(cursor).mkString
+        if hashes contains sha256(pwd) then passwords.addOne(pwd)
+        cursor += 1
+      }
+      passwords
+    }
+  }
+  //make this into one Future sequence and flattened into one list of passwords
+  Future.sequence(futures).map(_.flatten)
 }
