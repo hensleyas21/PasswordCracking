@@ -30,8 +30,26 @@ import scala.util.{Failure, Success}
       case Failure(exception) => throw exception
       case Success(result) => result
   )
+  val (time2, p2) = timeIt(Await.ready(allDigits(6, hashes), 10.seconds).value match
+    case None => Set.empty[String]
+    case Some(response) => response match
+      case Failure(exception) => throw exception
+      case Success(result) => result
+  )
+  val (time3, p3) = timeIt(repeatedCharacters(fullCharset, 26, hashes))
+  val (time4, p4) = timeIt(mostCommonPasswords(hashes))
+
   println(s"Time ran: ${time} ms")
   println(s"One Character Passwords: ${p.mkString(", ")}")
+
+  println(s"Time ran: ${time2} ms")
+  println(s"All-digit Passwords: ${p2.mkString(", ")}")
+
+  println(s"Time ran: ${time3} ms")
+  println(s"Repeated-character Passwords: ${p3.mkString(", ")}")
+
+  println(s"Time ran: ${time4} ms")
+  println(s"Most Common Passwords: ${p4.mkString(", ")}")
 
   println(s"Time ran: ${duration} ms")
   println(s"One Character Passwords: ${passwords.mkString(", ")}")
@@ -176,4 +194,24 @@ def parallelBruteForce(chars: String, length: Int, hashes: Set[String]): Future[
   }
   //make this into one Future sequence and flattened into one list of passwords
   Future.sequence(futures).map(_.flatten)
+}
+
+def allDigits(numDigits: Int, hashes: Set[String]): Future[Iterable[String]] = numDigits match {
+  case 0 => Future(List())
+  case _ => Future.reduceLeft(List(parallelBruteForce("1234567890", numDigits, hashes), allDigits(numDigits-1, hashes)))(_ ++ _)
+}
+
+def repeatedCharacters(chars: String, length: Int, hashes: Set[String]): Iterable[String] = length match {
+  case 0 => List()
+  case _ => chars.view.map(c => c.toString * length).filter(pwd => hashes.contains(sha256(pwd))) ++ repeatedCharacters(chars, length-1, hashes)
+}
+
+def mostCommonPasswords(hashes: Set[String]): Iterable[String] = {
+  val src = io.Source.fromInputStream(
+    getClass.getClassLoader.getResourceAsStream("most_common_pwds.txt"))
+  try {
+    src.getLines().filter(pwd => hashes.contains(sha256(pwd))).toList
+  } finally {
+    src.close()
+  }
 }
