@@ -21,41 +21,56 @@ import scala.util.{Failure, Success}
   val uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   val symbols = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
   val fullCharset = lowercase + uppercase + digits + symbols
-  // try brute forcing all passwords of a specific length n
-  val length = 3
-  val (duration, passwords) = timeIt(bruteForceLoop(fullCharset, length, hashes))
-  val (time, p) = timeIt(Await.ready(parallelBruteForce(fullCharset, length, hashes), 10.seconds).value match
+
+  val (time1_1, p1_1) = timeIt(Await.ready(parallelBruteForce(fullCharset, 1, hashes), 20.seconds).value match
     case None => Set.empty[String]
     case Some(response) => response match
       case Failure(exception) => throw exception
       case Success(result) => result
   )
-  val (time2, p2) = timeIt(Await.ready(allDigits(6, hashes), 10.seconds).value match
+  val (time1_2, p1_2) = timeIt(Await.ready(parallelBruteForce(fullCharset, 2, hashes), 20.seconds).value match
     case None => Set.empty[String]
     case Some(response) => response match
       case Failure(exception) => throw exception
       case Success(result) => result
   )
-  val (time3, p3) = timeIt(repeatedCharacters(fullCharset, 26, hashes))
+  val (time1_3, p1_3) = timeIt(Await.ready(parallelBruteForce(fullCharset, 3, hashes), 20.seconds).value match
+    case None => Set.empty[String]
+    case Some(response) => response match
+      case Failure(exception) => throw exception
+      case Success(result) => result
+  )
+  val p1 = p1_1 ++ p1_2 ++ p1_3
+  val time1 = time1_1 + time1_2 + time1_3
+  println(s"\nBrute Forced Passwords (len ≤ 3): ${p1.mkString(", ")}")
+  println(s"Time ran: $time1 ms\n")
+
+  val numDigits = 6
+  val (time2, p2) = timeIt(Await.ready(allDigits(numDigits, hashes), 20.seconds).value match
+    case None => Set.empty[String]
+    case Some(response) => response match
+      case Failure(exception) => throw exception
+      case Success(result) => result
+  )
+  println(s"All-digit Passwords (len ≤ $numDigits): ${p2.mkString(", ")}")
+  println(s"Time ran: ${time2} ms\n")
+
+  val numRepChars = 26
+  val (time3, p3) = timeIt(repeatedCharacters(fullCharset, numRepChars, hashes))
+  println(s"Repeated Character Passwords (len ≤ $numRepChars): ${p3.mkString(", ")}")
+  println(s"Time ran: ${time3} ms\n")
+
   val (time4, p4) = timeIt(mostCommonPasswords(hashes))
-
-  println(s"Time ran: ${time} ms")
-  println(s"One Character Passwords: ${p.mkString(", ")}")
-
-  println(s"Time ran: ${time2} ms")
-  println(s"All-digit Passwords: ${p2.mkString(", ")}")
-
-  println(s"Time ran: ${time3} ms")
-  println(s"Repeated-character Passwords: ${p3.mkString(", ")}")
-
-  println(s"Time ran: ${time4} ms")
   println(s"Most Common Passwords: ${p4.mkString(", ")}")
+  println(s"Time ran: ${time4} ms\n")
 
-  println(s"Time ran: ${duration} ms")
-  println(s"One Character Passwords: ${passwords.mkString(", ")}")
+  val allPwds = (p1 ++ p2 ++ p3 ++ p4).toSet.toList.sorted
+  println(s"\nAll Passwords: ${allPwds.mkString(", ")}")
+  println(s"Total Number of Passwords: ${allPwds.size}")
+
   // note that the getCombination function could also be used to combine words . . .
-  val words = Vector("correct", "horse", "battery", "staple")
-  println(getCombination(words)(2)(BigInt(7)).mkString)
+  // val words = Vector("correct", "horse", "battery", "staple")
+  // println(getCombination(words)(2)(BigInt(7)).mkString)
 }
 
 // brute force try every order of chars in charset with replacement using collection methods
